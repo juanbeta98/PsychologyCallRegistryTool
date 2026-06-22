@@ -1,0 +1,481 @@
+{% extends "base.html" %}
+{% block title %}Reportes{% endblock %}
+
+{% block head %}
+<style>
+  .section-divider {
+    font-size: .78rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .1em; color: #6c757d;
+    border-left: 3px solid #4472C4; padding-left: .7rem;
+    margin: 1.8rem 0 1rem;
+  }
+  .funnel-row { margin-bottom: .55rem; }
+  .funnel-label { font-size: .82rem; color: #444; margin-bottom: .2rem; }
+  .funnel-bar { height: 28px; border-radius: 5px; display: flex; align-items: center;
+    padding: 0 .7rem; font-size: .8rem; font-weight: 600; color: #fff;
+    min-width: 36px; transition: width .6s ease; }
+  .result-kpi { text-align: center; padding: .8rem .5rem; }
+  .result-kpi .kpi-num { font-size: 1.9rem; font-weight: 800; line-height: 1; }
+  .result-kpi .kpi-label { font-size: .75rem; color: #6c757d; margin-top: .25rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 class="fw-bold mb-0" style="color:#1e2a45">
+    <i class="bi bi-file-earmark-bar-graph-fill me-2" style="color:#4472C4"></i>Reportes
+  </h4>
+  <a href="/informe" target="_blank" class="btn btn-sm btn-outline-primary">
+    <i class="bi bi-file-earmark-richtext me-1"></i>Generar Informe PDF
+  </a>
+</div>
+
+<!-- KPI cards -->
+<div class="row g-3 mb-2" id="summary-cards"></div>
+
+<!-- Export section -->
+<div class="section-divider"><i class="bi bi-download me-1"></i>Exportar datos</div>
+<div class="card border-0 shadow-sm mb-2" style="border-radius:10px">
+  <div class="card-body py-2">
+    <div class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label small mb-1 fw-semibold">Desde</label>
+        <input type="date" class="form-control form-control-sm" id="export-from">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small mb-1 fw-semibold">Hasta</label>
+        <input type="date" class="form-control form-control-sm" id="export-to">
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-success btn-sm" onclick="downloadExcel()">
+          <i class="bi bi-file-earmark-excel me-1"></i>Descargar Excel
+        </button>
+      </div>
+      <div class="col">
+        <span class="text-muted small">Dejar vacío para exportar todas las fechas</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- No data message -->
+<div id="no-data-msg" class="alert alert-info d-none">
+  Aún no hay llamadas registradas. Los gráficos aparecerán una vez se registren llamadas.
+</div>
+
+<!-- Section: Gestión de llamadas -->
+<div class="section-divider" id="sec-gestion" style="display:none">
+  <i class="bi bi-telephone-fill me-1"></i>Gestión de llamadas
+</div>
+<div class="row g-3 mb-3" id="sec-gestion-content" style="display:none">
+  <!-- Funnel -->
+  <div class="col-md-5">
+    <div class="card border-0 shadow-sm h-100" style="border-radius:10px">
+      <div class="card-body">
+        <div class="fw-semibold small text-muted mb-3">Embudo de cobertura</div>
+        <div id="funnel-container"></div>
+      </div>
+    </div>
+  </div>
+  <!-- Outcome donut -->
+  <div class="col-md-7">
+    <div class="card border-0 shadow-sm h-100" style="border-radius:10px">
+      <div class="card-body">
+        <div class="fw-semibold small text-muted mb-2">Resultados de llamadas</div>
+        <canvas id="r-outcome" height="190"></canvas>
+      </div>
+    </div>
+  </div>
+  <!-- Timeline -->
+  <div class="col-12">
+    <div class="card border-0 shadow-sm" style="border-radius:10px">
+      <div class="card-body">
+        <div class="fw-semibold small text-muted mb-2">Llamadas por día</div>
+        <canvas id="r-timeline" height="110"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Section: Demografía -->
+<div class="section-divider" id="sec-demo" style="display:none">
+  <i class="bi bi-people-fill me-1"></i>Perfil demográfico (población contactada)
+</div>
+<div id="sec-demo-content" style="display:none">
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm h-100" style="border-radius:10px">
+        <div class="card-body">
+          <div class="fw-semibold small text-muted mb-2">Distribución por sexo</div>
+          <canvas id="r-sex" height="200"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm h-100" style="border-radius:10px">
+        <div class="card-body">
+          <div class="fw-semibold small text-muted mb-2">Estrato socioeconómico</div>
+          <canvas id="r-strata" height="200"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm h-100" style="border-radius:10px">
+        <div class="card-body">
+          <div class="fw-semibold small text-muted mb-2">Zona</div>
+          <canvas id="r-zone" height="200"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-12">
+      <div class="card border-0 shadow-sm" style="border-radius:10px">
+        <div class="card-body">
+          <div class="fw-semibold small text-muted mb-2">Top ciudades</div>
+          <canvas id="r-cities" height="110"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Section: Entrevistas -->
+<div class="section-divider" id="sec-iv" style="display:none">
+  <i class="bi bi-clipboard2-pulse-fill me-1"></i>Hallazgos de entrevistas
+</div>
+<div id="sec-iv-content" style="display:none">
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm h-100" style="border-radius:10px">
+        <div class="card-body">
+          <div class="fw-semibold small text-muted mb-2">Horas de estudio por día</div>
+          <canvas id="r-study-hours" height="210"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm h-100" style="border-radius:10px">
+        <div class="card-body">
+          <div class="fw-semibold small text-muted mb-2">Autonomía en virtualidad</div>
+          <canvas id="r-autonomy" height="210"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm h-100" style="border-radius:10px">
+        <div class="card-body">
+          <div class="fw-semibold small text-muted mb-2">Motivación semestre (1–5)</div>
+          <canvas id="r-motivation" height="210"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-12">
+      <div class="card border-0 shadow-sm" style="border-radius:10px">
+        <div class="card-body">
+          <div class="fw-semibold small text-muted mb-2">Acceso a herramientas digitales</div>
+          <canvas id="r-tools" height="90"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Section: Resultados -->
+<div class="section-divider" id="sec-res" style="display:none">
+  <i class="bi bi-heart-pulse-fill me-1"></i>Resultados del acompañamiento
+</div>
+<div id="sec-res-content" style="display:none">
+  <div class="row g-3 mb-3">
+    <div class="col-md-8">
+      <div class="card border-0 shadow-sm h-100" style="border-radius:10px">
+        <div class="card-body">
+          <div class="row" id="result-kpis"></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm h-100" style="border-radius:10px">
+        <div class="card-body">
+          <div class="fw-semibold small text-muted mb-2">Aceptación del seguimiento</div>
+          <canvas id="r-acceptance" height="200"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Section: Listas importadas -->
+<div class="section-divider"><i class="bi bi-table me-1"></i>Listas importadas</div>
+<div class="row g-3 mb-4">
+  <div class="col-12">
+    <div class="card border-0 shadow-sm" style="border-radius:10px">
+      <div class="card-body" id="batches-detail"></div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const chartInstances = {};
+function mkChart(id, config) {
+  if (chartInstances[id]) chartInstances[id].destroy();
+  const el = document.getElementById(id);
+  if (!el) return;
+  chartInstances[id] = new Chart(el, config);
+}
+
+const OUTCOME_COLORS = {
+  'No contestó': '#adb5bd',
+  'No pudo hablar': '#ffc107',
+  'Conversación completa': '#4472C4',
+  'Caso crítico': '#dc3545',
+};
+
+async function loadReports() {
+  const [summary, charts] = await Promise.all([
+    fetch('/api/reports/summary').then(r => r.json()),
+    fetch('/api/reports/charts').then(r => r.json()),
+  ]);
+
+  renderStatCards(summary);
+  renderBatches(summary.batches);
+
+  if (!charts.calls.total) {
+    document.getElementById('no-data-msg').classList.remove('d-none');
+    return;
+  }
+
+  show('sec-gestion'); show('sec-gestion-content');
+  renderFunnel(charts.funnel);
+  renderOutcome(charts.calls.by_outcome);
+  renderTimeline(charts.calls.by_date);
+
+  if (charts.students.total_contacted > 0) {
+    show('sec-demo'); show('sec-demo-content');
+    renderDemographics(charts.demographics);
+  }
+
+  if (charts.students.total_interviews > 0) {
+    show('sec-iv'); show('sec-iv-content');
+    renderInterviews(charts.interview_findings);
+    show('sec-res'); show('sec-res-content');
+    renderResults(charts.results);
+  }
+}
+
+function show(id) { document.getElementById(id).style.display = ''; }
+
+// ── Stat cards ────────────────────────────────────────────────
+function renderStatCards(s) {
+  const cards = [
+    { label: 'Total estudiantes', value: s.total_students, color: 'primary', icon: 'bi-people' },
+    { label: 'Activos (lista vigente)', value: s.active_students, color: 'success', icon: 'bi-person-check' },
+    { label: 'Marcados para llamar', value: s.marked_for_call, color: 'warning', icon: 'bi-bell' },
+    { label: 'Total llamadas', value: s.total_calls, color: 'info', icon: 'bi-telephone' },
+  ];
+  document.getElementById('summary-cards').innerHTML = cards.map(c => `
+    <div class="col-6 col-md-3">
+      <div class="card stat-card">
+        <div class="card-body">
+          <div class="text-muted small mb-1"><i class="bi ${c.icon} me-1"></i>${c.label}</div>
+          <div class="stat-number text-${c.color}">${c.value}</div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+// ── Funnel ────────────────────────────────────────────────────
+function renderFunnel(f) {
+  const max = f.total_students || 1;
+  const steps = [
+    { label: 'Estudiantes en listas', value: f.total_students, color: '#1e2a45' },
+    { label: 'Contactados con llamada', value: f.contacted, color: '#4472C4' },
+    { label: 'Participaron en entrevista', value: f.with_interview, color: '#C25A00' },
+    { label: 'Aceptaron seguimiento', value: f.accepted, color: '#198754' },
+  ];
+  document.getElementById('funnel-container').innerHTML = steps.map(s => {
+    const pct = Math.round(s.value / max * 100);
+    const subPct = steps[0].value > 0 && s.label !== steps[0].label
+      ? ` (${Math.round(s.value / steps[0].value * 100)}%)`
+      : '';
+    return `
+      <div class="funnel-row">
+        <div class="funnel-label d-flex justify-content-between">
+          <span>${s.label}</span>
+          <strong>${s.value}${subPct}</strong>
+        </div>
+        <div class="funnel-bar" style="width:${Math.max(pct,5)}%;background:${s.color}">${s.value}</div>
+      </div>`;
+  }).join('');
+}
+
+// ── Outcome donut ─────────────────────────────────────────────
+function renderOutcome(by_outcome) {
+  const labels = Object.keys(by_outcome);
+  mkChart('r-outcome', {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: Object.values(by_outcome), backgroundColor: labels.map(l => OUTCOME_COLORS[l] || '#adb5bd'), borderWidth: 2 }]
+    },
+    options: { plugins: { legend: { position: 'right', labels: { font: { size: 11 }, boxWidth: 14 } } }, cutout: '60%' }
+  });
+}
+
+// ── Timeline ──────────────────────────────────────────────────
+function renderTimeline(byDate) {
+  mkChart('r-timeline', {
+    type: 'line',
+    data: {
+      labels: byDate.map(d => d.date),
+      datasets: [{ label: 'Llamadas', data: byDate.map(d => d.count),
+        borderColor: '#4472C4', backgroundColor: 'rgba(68,114,196,.12)',
+        fill: true, tension: .35, pointRadius: 3, pointBackgroundColor: '#4472C4' }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: { x: { ticks: { font: { size: 10 }, maxTicksLimit: 12 } }, y: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
+}
+
+// ── Demographics ──────────────────────────────────────────────
+const BLUE_PALETTE = ['#1e2a45','#4472C4','#5d8cd0','#8aabd8','#b5c9e8','#d8e4f3'];
+const TEAL_PALETTE = ['#0a6b5d','#198754','#28a870','#57be90','#86d4b0','#b5ead0'];
+
+function renderDemographics(demo) {
+  // Sex
+  const sexLabels = Object.keys(demo.by_sex);
+  mkChart('r-sex', {
+    type: 'doughnut',
+    data: { labels: sexLabels, datasets: [{ data: Object.values(demo.by_sex), backgroundColor: BLUE_PALETTE, borderWidth: 2 }] },
+    options: { plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } } }, cutout: '55%' }
+  });
+
+  // Strata
+  const stLabels = Object.keys(demo.by_strata);
+  mkChart('r-strata', {
+    type: 'bar',
+    data: { labels: stLabels.map(l => `Estrato ${l}`), datasets: [{ data: Object.values(demo.by_strata), backgroundColor: BLUE_PALETTE, borderRadius: 4 }] },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+
+  // Zone
+  const zLabels = Object.keys(demo.by_zone);
+  mkChart('r-zone', {
+    type: 'doughnut',
+    data: { labels: zLabels, datasets: [{ data: Object.values(demo.by_zone), backgroundColor: TEAL_PALETTE, borderWidth: 2 }] },
+    options: { plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } } }, cutout: '55%' }
+  });
+
+  // Cities
+  const cities = demo.top_cities;
+  mkChart('r-cities', {
+    type: 'bar',
+    data: { labels: cities.map(c => c.city), datasets: [{ data: cities.map(c => c.count), backgroundColor: '#4472C4', borderRadius: 4 }] },
+    options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+}
+
+// ── Interview charts ──────────────────────────────────────────
+function renderInterviews(iv) {
+  // Study hours
+  mkChart('r-study-hours', {
+    type: 'doughnut',
+    data: { labels: Object.keys(iv.study_hours), datasets: [{ data: Object.values(iv.study_hours), backgroundColor: BLUE_PALETTE, borderWidth: 2 }] },
+    options: { plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } } }, cutout: '55%' }
+  });
+
+  // Autonomy
+  mkChart('r-autonomy', {
+    type: 'bar',
+    data: {
+      labels: Object.keys(iv.autonomy),
+      datasets: [{ data: Object.values(iv.autonomy), backgroundColor: ['#198754','#ffc107','#dc3545'], borderRadius: 5 }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+
+  // Motivation
+  const motColors = ['#dc3545','#fd7e14','#ffc107','#20c997','#198754'];
+  mkChart('r-motivation', {
+    type: 'bar',
+    data: { labels: ['1','2','3','4','5'], datasets: [{ data: Object.values(iv.motivation_dist), backgroundColor: motColors, borderRadius: 5 }] },
+    options: {
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { title: ctx => `Motivación ${ctx[0].label}/5` } }
+      },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
+
+  // Tools
+  mkChart('r-tools', {
+    type: 'bar',
+    data: {
+      labels: ['Teams', 'Correo institucional'],
+      datasets: [
+        { label: 'Sí', data: [iv.teams['Sí'], iv.email['Sí']], backgroundColor: '#198754', borderRadius: 4 },
+        { label: 'No', data: [iv.teams['No'], iv.email['No']], backgroundColor: '#dc3545', borderRadius: 4 },
+      ]
+    },
+    options: { plugins: { legend: { position: 'right' } }, scales: { x: { stacked: false }, y: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+}
+
+// ── Results ───────────────────────────────────────────────────
+function renderResults(res) {
+  const kpis = [
+    { label: 'Aceptaron seguimiento', value: res.accepted_support, color: '#198754' },
+    { label: 'Rechazaron seguimiento', value: res.refused_support, color: '#dc3545' },
+    { label: 'Acompañamiento psicosocial', value: res.psychosocial_accompaniment, color: '#C25A00' },
+    { label: 'Casos críticos', value: res.critical_cases, color: '#842029' },
+    { label: 'Remitidos', value: res.referred, color: '#0a6b5d' },
+  ];
+  document.getElementById('result-kpis').innerHTML = kpis.map(k => `
+    <div class="col-4 col-md result-kpi">
+      <div class="kpi-num" style="color:${k.color}">${k.value}</div>
+      <div class="kpi-label">${k.label}</div>
+    </div>`).join('');
+
+  if (res.accepted_support + res.refused_support > 0) {
+    mkChart('r-acceptance', {
+      type: 'doughnut',
+      data: {
+        labels: ['Aceptó', 'Rechazó'],
+        datasets: [{ data: [res.accepted_support, res.refused_support], backgroundColor: ['#198754','#dc3545'], borderWidth: 2 }]
+      },
+      options: { plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } } }, cutout: '55%' }
+    });
+  }
+}
+
+// ── Batches ───────────────────────────────────────────────────
+function renderBatches(batches) {
+  const bd = document.getElementById('batches-detail');
+  if (!batches.length) { bd.innerHTML = '<p class="text-muted small mb-0">Sin listas importadas.</p>'; return; }
+  bd.innerHTML = `<div class="row g-2">${batches.map(b => `
+    <div class="col-md-6 col-lg-4">
+      <div class="p-2 border rounded small">
+        <div class="fw-semibold text-truncate" title="${b.filename}">${b.filename}</div>
+        <div class="text-muted">${b.student_count} estudiantes · Importado ${b.import_date}</div>
+        <div>Vigencia: ${b.validity_date} <span class="badge ms-1 ${b.is_active ? 'bg-success' : 'bg-secondary'}">${b.is_active ? 'Activa' : 'Vencida'}</span></div>
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+// ── Excel export ──────────────────────────────────────────────
+function downloadExcel() {
+  const from = document.getElementById('export-from').value;
+  const to = document.getElementById('export-to').value;
+  const params = new URLSearchParams();
+  if (from) params.append('from_date', from);
+  if (to) params.append('to_date', to);
+  const qs = params.toString();
+  window.location.href = '/api/reports/export' + (qs ? '?' + qs : '');
+}
+
+loadReports();
+</script>
+{% endblock %}

@@ -1,0 +1,528 @@
+{% extends "base.html" %}
+{% block title %}Estudiantes{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/3.0.2/css/buttons.bootstrap5.min.css">
+<style>
+  .chart-container { position: relative; height: 260px; }
+  .mark-cell { text-align: center; }
+  .mark-toggle {
+    width: 22px; height: 22px; cursor: pointer; accent-color: #4472C4;
+    transform: scale(1.3);
+  }
+  tr.is-marked { background: #eef3fc !important; }
+  tr.is-marked td { border-left: 3px solid #4472C4; }
+  .col-filter { width: 100%; font-size: .75rem; padding: 2px 4px; border: 1px solid #dee2e6; border-radius: 4px; }
+  .col-filter:focus { outline: none; border-color: #4472C4; }
+  tfoot input.col-filter { margin-top: 4px; }
+
+  /* Callout box */
+  .workflow-hint {
+    background: #eef3fc; border-left: 4px solid #4472C4;
+    border-radius: 6px; padding: .6rem 1rem; font-size: .85rem; color: #1e2a45;
+  }
+
+  /* Chart filters */
+  .chart-filter-bar { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .75rem; }
+  .chart-filter-bar select { font-size: .8rem; padding: .2rem .5rem; border-radius: 6px; border: 1px solid #dee2e6; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-2 gap-3">
+  <h4 class="fw-bold mb-0" style="color:#1e2a45">
+    <i class="bi bi-people-fill me-2" style="color:#4472C4"></i>Estudiantes
+  </h4>
+  <select id="batch-filter" class="form-select form-select-sm" style="width:auto">
+    <option value="">Todas las listas</option>
+    {% for b in batches %}
+    <option value="{{ b.id }}">{{ b.filename }}{% if not b.is_active %} (Vencida){% endif %}</option>
+    {% endfor %}
+  </select>
+  <span id="total-badge" class="badge bg-primary rounded-pill fs-6"></span>
+</div>
+
+<div class="workflow-hint mb-3">
+  <i class="bi bi-info-circle-fill me-1"></i>
+  <strong>Cómo usar esta página:</strong> usa los filtros de la tabla para explorar los datos.
+  Marca con el <i class="bi bi-check-square"></i> a los estudiantes que quieres contactar.
+  Luego ve a <a href="/llamadas" class="fw-semibold">Llamadas</a> para gestionar el proceso.
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-3" id="studentTabs">
+  <li class="nav-item">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-table">
+      <i class="bi bi-table me-1"></i>Tabla de exploración
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-charts" id="charts-tab-btn">
+      <i class="bi bi-bar-chart me-1"></i>Visualizaciones
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content">
+  <!-- ── TABLE TAB ── -->
+  <div class="tab-pane fade show active" id="tab-table">
+    <div class="card border-0 shadow-sm" style="border-radius:10px">
+      <div class="card-body p-3">
+
+        <!-- Action bar -->
+        <div class="d-flex gap-2 flex-wrap align-items-center mb-3">
+          <button class="btn btn-sm btn-primary" id="btn-mark-selected">
+            <i class="bi bi-check2-square me-1"></i>Marcar seleccionados para llamar
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" id="btn-unmark-selected">
+            <i class="bi bi-square me-1"></i>Desmarcar seleccionados
+          </button>
+          <div id="colvis-container" class="ms-auto"></div>
+          <span class="text-muted small" id="selected-count" style="white-space:nowrap">0 seleccionados</span>
+        </div>
+
+        <!-- Legend -->
+        <div class="d-flex gap-3 align-items-center mb-2 small text-muted">
+          <span><span style="display:inline-block;width:12px;height:12px;background:#eef3fc;border-left:3px solid #4472C4;margin-right:4px;"></span>Marcado para llamar</span>
+          <span><i class="bi bi-funnel-fill me-1"></i>Escribe en los campos de la segunda fila para filtrar por columna</span>
+        </div>
+
+        <div class="table-responsive">
+          <table id="students-table" class="table table-sm table-hover w-100" style="font-size:.82rem">
+            <thead>
+              <tr>
+                <th style="width:30px"><input type="checkbox" id="check-all" title="Seleccionar todos"></th>
+                <th>Para llamar</th>
+                <th>Documento</th>
+                <th>Nombre</th>
+                <th>Escuela</th>
+                <th>Programa</th>
+                <th>Edad</th>
+                <th>Sexo</th>
+                <th>Orientación sexual</th>
+                <th>Ciudad</th>
+                <th>Estrato</th>
+                <th>Zona</th>
+                <th>Vive con</th>
+                <th>Cond. médica</th>
+                <th>Diagnóstico psiq.</th>
+                <th>Terapia</th>
+                <th>Apoyo familiar</th>
+                <th>Satisfacción vida</th>
+                <th>Recursos económicos</th>
+              </tr>
+              <tr id="filter-row">
+                <th></th>
+                <th></th>
+                <th><input class="col-filter" placeholder="Buscar…"></th>
+                <th><input class="col-filter" placeholder="Buscar…"></th>
+                <th><input class="col-filter" placeholder="Buscar…"></th>
+                <th><input class="col-filter" placeholder="Buscar…"></th>
+                <th><input class="col-filter" placeholder="Buscar…"></th>
+                <th><select class="col-filter"><option value="">Todos</option></select></th>
+                <th><select class="col-filter"><option value="">Todos</option></select></th>
+                <th><input class="col-filter" placeholder="Buscar…"></th>
+                <th><select class="col-filter"><option value="">Todos</option></select></th>
+                <th><select class="col-filter"><option value="">Todos</option></select></th>
+                <th><select class="col-filter"><option value="">Todos</option></select></th>
+                <th><select class="col-filter"><option value="">Todos</option></select></th>
+                <th><select class="col-filter"><option value="">Todos</option></select></th>
+                <th><select class="col-filter"><option value="">Todos</option></select></th>
+                <th><select class="col-filter"><option value="">Todos</option></select></th>
+                <th><select class="col-filter"><option value="">Todos</option></select></th>
+                <th><select class="col-filter"><option value="">Todos</option></select></th>
+              </tr>
+            </thead>
+            <tbody id="students-tbody"></tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CHARTS TAB ── -->
+  <div class="tab-pane fade" id="tab-charts">
+
+    <div class="chart-filter-bar mb-3 p-3 rounded" style="background:#f0f4fc">
+      <strong class="me-2 small">Filtrar visualizaciones:</strong>
+      <select id="cf-school" class="form-select form-select-sm" style="width:auto">
+        <option value="">Todas las escuelas</option>
+      </select>
+      <select id="cf-sex" class="form-select form-select-sm" style="width:auto">
+        <option value="">Todos los sexos</option>
+      </select>
+      <select id="cf-marked" class="form-select form-select-sm" style="width:auto">
+        <option value="">Todos los estudiantes</option>
+        <option value="1">Solo marcados para llamar</option>
+      </select>
+      <button class="btn btn-sm btn-primary" id="btn-refresh-charts">
+        <i class="bi bi-arrow-clockwise me-1"></i>Actualizar gráficas
+      </button>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3">
+          <div class="fw-semibold mb-2 small text-muted text-uppercase">Sexo</div>
+          <div class="chart-container"><canvas id="chart-sex"></canvas></div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3">
+          <div class="fw-semibold mb-2 small text-muted text-uppercase">Estrato socioeconómico</div>
+          <div class="chart-container"><canvas id="chart-strata"></canvas></div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3">
+          <div class="fw-semibold mb-2 small text-muted text-uppercase">Escuela</div>
+          <div class="chart-container"><canvas id="chart-school"></canvas></div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3">
+          <div class="fw-semibold mb-2 small text-muted text-uppercase">Rango de edad</div>
+          <div class="chart-container"><canvas id="chart-age"></canvas></div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3">
+          <div class="fw-semibold mb-2 small text-muted text-uppercase">Condición médica</div>
+          <div class="chart-container"><canvas id="chart-medical"></canvas></div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3">
+          <div class="fw-semibold mb-2 small text-muted text-uppercase">Apoyo familiar para estudiar</div>
+          <div class="chart-container"><canvas id="chart-family"></canvas></div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3">
+          <div class="fw-semibold mb-2 small text-muted text-uppercase">Diagnóstico salud mental</div>
+          <div class="chart-container"><canvas id="chart-psych"></canvas></div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3">
+          <div class="fw-semibold mb-2 small text-muted text-uppercase">Zona de residencia</div>
+          <div class="chart-container"><canvas id="chart-zone"></canvas></div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3">
+          <div class="fw-semibold mb-2 small text-muted text-uppercase">Satisfacción con la vida</div>
+          <div class="chart-container"><canvas id="chart-life"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.datatables.net/buttons/3.0.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/3.0.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/3.0.2/js/buttons.colVis.min.js"></script>
+<script>
+const PALETTE = ['#4472C4','#ED7D31','#A9D18E','#FF6384','#9b59b6','#1abc9c','#e74c3c','#f39c12','#3498db','#2ecc71'];
+
+let allStudents = [];
+let dtTable = null;
+const chartInstances = {};
+
+// ─── Load data ────────────────────────────────────────────────
+async function loadStudents() {
+  const batchId = document.getElementById('batch-filter').value;
+  const url = '/api/students' + (batchId ? `?batch_id=${batchId}` : '');
+  allStudents = await fetch(url).then(r => r.json());
+  populateFilterDropdowns();
+  renderTable();
+  populateChartFilters();
+}
+
+// ─── Populate filter row dropdowns ───────────────────────────
+function populateFilterDropdowns() {
+  const cols = {
+    7: 'sex', 8: 'sexual_orientation', 10: 'strata', 11: 'zone',
+    12: 'lives_with', 13: 'has_medical_condition', 14: 'has_psychiatric_diagnosis',
+    15: 'attends_therapy', 16: 'family_support', 17: 'life_satisfaction',
+    18: 'economic_resources'
+  };
+  // Map col index (0-based in filter row) to data field
+  const filterRow = document.getElementById('filter-row');
+  const selects = filterRow.querySelectorAll('select.col-filter');
+  // selects[0]=sex(col7), selects[1]=orientation(col8), etc.
+  // We need to map by column position in filter row (skipping first 2 th's = checkbox + para llamar)
+  const fieldOrder = ['sex','sexual_orientation','','strata','zone','lives_with',
+    'has_medical_condition','has_psychiatric_diagnosis','attends_therapy','family_support',
+    'life_satisfaction','economic_resources'];
+  selects.forEach((sel, i) => {
+    const field = fieldOrder[i];
+    if (!field) return;
+    const vals = [...new Set(allStudents.map(s => s[field] || '').filter(v => v && v !== 'None'))].sort();
+    sel.innerHTML = '<option value="">Todos</option>' +
+      vals.map(v => `<option value="${v}">${v}</option>`).join('');
+  });
+}
+
+// ─── Render table ─────────────────────────────────────────────
+function renderTable() {
+  if (dtTable) { dtTable.destroy(); dtTable = null; }
+
+  const tbody = document.getElementById('students-tbody');
+  tbody.innerHTML = allStudents.map(s => {
+    const marked = s.is_marked;
+    const active = s.batch_active;
+    return `<tr class="${marked ? 'is-marked' : ''}" id="row-${s.id}">
+      <td class="mark-cell"><input type="checkbox" class="row-check" data-id="${s.id}" ${!active ? 'disabled' : ''}></td>
+      <td class="mark-cell">
+        <input type="checkbox" class="mark-toggle" data-id="${s.id}"
+          ${marked ? 'checked' : ''} ${!active ? 'disabled' : ''}
+          title="${marked ? 'Marcado para llamar — haz clic para desmarcar' : 'Haz clic para marcar para llamar'}">
+      </td>
+      <td>${s.doc_number}</td>
+      <td>${s.full_name}</td>
+      <td>${s.school}</td>
+      <td>${s.program}</td>
+      <td>${s.age || ''}</td>
+      <td>${s.sex}</td>
+      <td>${s.sexual_orientation || ''}</td>
+      <td>${s.city}</td>
+      <td>${s.strata}</td>
+      <td>${s.zone || ''}</td>
+      <td>${s.lives_with || ''}</td>
+      <td>${s.has_medical_condition || ''}</td>
+      <td>${s.has_psychiatric_diagnosis || ''}</td>
+      <td>${s.attends_therapy || ''}</td>
+      <td>${s.family_support || ''}</td>
+      <td>${s.life_satisfaction || ''}</td>
+      <td>${s.economic_resources || ''}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('total-badge').textContent = `${allStudents.length} estudiantes`;
+
+  dtTable = $('#students-table').DataTable({
+    orderCellsTop: true,
+    colReorder: true,
+    pageLength: 25,
+    dom: '<"d-flex justify-content-between align-items-center mb-2"<"d-flex align-items-center gap-2"B><"d-flex align-items-center gap-2"lf>>rtip',
+    buttons: [{
+      extend: 'colvis',
+      text: '<i class="bi bi-layout-three-columns me-1"></i>Columnas visibles',
+      className: 'btn btn-sm btn-outline-secondary',
+      columns: ':gt(1)',
+    }],
+    language: {
+      search: '', searchPlaceholder: 'Buscar en toda la tabla…',
+      paginate: {previous:'‹', next:'›'},
+      lengthMenu: 'Mostrar _MENU_',
+      info: '_START_–_END_ de _TOTAL_',
+      zeroRecords: 'Sin resultados',
+      buttons: { colvis: 'Columnas' }
+    },
+    columnDefs: [
+      { orderable: false, targets: [0, 1] },
+      { visible: true, targets: '_all' },
+    ],
+    initComplete: function() {
+      // Per-column filtering
+      this.api().columns().every(function(colIdx) {
+        const filterCells = document.querySelectorAll('#filter-row th');
+        const input = filterCells[colIdx]?.querySelector('input, select');
+        if (!input) return;
+        $(input).on('input change', () => {
+          if (this.search() !== input.value) {
+            this.search(input.value).draw();
+          }
+        });
+      });
+      // Move ColVis button to our container
+      const btns = document.querySelector('.dt-buttons');
+      if (btns) document.getElementById('colvis-container').appendChild(btns);
+    }
+  });
+}
+
+function applyMarkVisual(studentId, isMarked) {
+  const row = document.getElementById(`row-${studentId}`);
+  if (!row) return;
+  row.classList.toggle('is-marked', isMarked);
+  const toggle = row.querySelector('.mark-toggle');
+  if (toggle) {
+    toggle.checked = isMarked;
+    toggle.title = isMarked
+      ? 'Marcado para llamar — haz clic para desmarcar'
+      : 'Haz clic para marcar para llamar';
+  }
+}
+
+async function toggleMark(studentId, checkbox) {
+  const res = await fetch(`/api/students/${studentId}/toggle_mark`, { method: 'POST' });
+  const data = await res.json();
+  if (!res.ok) { alert(data.error); checkbox.checked = !checkbox.checked; return; }
+  const s = allStudents.find(s => s.id === studentId);
+  if (s) { s.is_marked = data.is_marked; s.call_status = data.call_status; }
+  applyMarkVisual(studentId, data.is_marked);
+}
+
+// ─── Event delegation for all rows (works across all DataTables pages) ───────
+document.getElementById('students-table').addEventListener('change', function(e) {
+  if (e.target.classList.contains('mark-toggle') && !e.target.disabled) {
+    toggleMark(parseInt(e.target.dataset.id), e.target);
+  } else if (e.target.classList.contains('row-check')) {
+    updateSelectedCount();
+  }
+});
+
+// ─── Select all / bulk actions ────────────────────────────────
+document.getElementById('check-all').addEventListener('change', function() {
+  document.querySelectorAll('.row-check:not(:disabled)').forEach(cb => cb.checked = this.checked);
+  updateSelectedCount();
+});
+
+function updateSelectedCount() {
+  const n = document.querySelectorAll('.row-check:checked').length;
+  document.getElementById('selected-count').textContent = n ? `${n} seleccionados` : '';
+}
+
+async function bulkToggle(onlyUnmarked) {
+  const ids = [...document.querySelectorAll('.row-check:checked')].map(cb => parseInt(cb.dataset.id));
+  if (!ids.length) { alert('Selecciona al menos un estudiante.'); return; }
+  const targets = allStudents.filter(s =>
+    ids.includes(s.id) && (onlyUnmarked ? !s.is_marked : s.is_marked)
+  );
+  if (!targets.length) {
+    document.querySelectorAll('.row-check:checked').forEach(cb => cb.checked = false);
+    updateSelectedCount();
+    return;
+  }
+  await Promise.all(targets.map(async s => {
+    const res = await fetch(`/api/students/${s.id}/toggle_mark`, { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      s.is_marked = data.is_marked;
+      s.call_status = data.call_status;
+      applyMarkVisual(s.id, data.is_marked);
+    }
+  }));
+  document.querySelectorAll('.row-check:checked').forEach(cb => cb.checked = false);
+  updateSelectedCount();
+}
+
+document.getElementById('btn-mark-selected').addEventListener('click', () => bulkToggle(true));
+document.getElementById('btn-unmark-selected').addEventListener('click', () => bulkToggle(false));
+
+document.getElementById('batch-filter').addEventListener('change', loadStudents);
+
+// ─── Charts ───────────────────────────────────────────────────
+function populateChartFilters() {
+  const schools = [...new Set(allStudents.map(s => s.school).filter(Boolean))].sort();
+  const sexes = [...new Set(allStudents.map(s => s.sex).filter(Boolean))].sort();
+  const schoolSel = document.getElementById('cf-school');
+  const sexSel = document.getElementById('cf-sex');
+  schoolSel.innerHTML = '<option value="">Todas las escuelas</option>' +
+    schools.map(v => `<option value="${v}">${v}</option>`).join('');
+  sexSel.innerHTML = '<option value="">Todos los sexos</option>' +
+    sexes.map(v => `<option value="${v}">${v}</option>`).join('');
+}
+
+function getFilteredStudents() {
+  const school = document.getElementById('cf-school').value;
+  const sex = document.getElementById('cf-sex').value;
+  const onlyMarked = document.getElementById('cf-marked').value === '1';
+  return allStudents.filter(s =>
+    (!school || s.school === school) &&
+    (!sex || s.sex === sex) &&
+    (!onlyMarked || s.is_marked)
+  );
+}
+
+function count(arr, key) {
+  const m = {};
+  arr.forEach(s => {
+    let v = s[key] || 'Sin dato';
+    if (typeof v === 'string') v = v.trim() || 'Sin dato';
+    m[v] = (m[v] || 0) + 1;
+  });
+  return m;
+}
+
+function makeChart(id, type, data, options = {}) {
+  if (chartInstances[id]) chartInstances[id].destroy();
+  const labels = Object.keys(data);
+  const values = Object.values(data);
+  const colors = labels.map((_, i) => PALETTE[i % PALETTE.length]);
+  chartInstances[id] = new Chart(document.getElementById(id), {
+    type,
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: type === 'bar' ? '#4472C4' : colors,
+        borderColor: type === 'bar' ? '#3461b3' : colors,
+        borderWidth: 1,
+        borderRadius: type === 'bar' ? 4 : 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: type !== 'bar',
+          position: 'bottom',
+          labels: { font: { size: 11 }, padding: 10, boxWidth: 12 }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+              const pct = ((ctx.parsed / total) * 100).toFixed(1);
+              return ` ${ctx.parsed} (${pct}%)`;
+            }
+          }
+        }
+      },
+      scales: type === 'bar' ? {
+        y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f0f0f0' } },
+        x: { ticks: { font: { size: 11 } } }
+      } : undefined,
+      ...options
+    }
+  });
+}
+
+function buildCharts() {
+  const students = getFilteredStudents();
+
+  makeChart('chart-sex', 'doughnut', count(students, 'sex'));
+  makeChart('chart-strata', 'bar', count(students, 'strata'));
+  makeChart('chart-school', 'doughnut', count(students, 'school'));
+
+  const ageBins = {'≤ 22':0,'23–27':0,'28–35':0,'36+':0,'Sin dato':0};
+  students.forEach(s => {
+    const a = parseInt(s.age);
+    if (!a) ageBins['Sin dato']++;
+    else if (a <= 22) ageBins['≤ 22']++;
+    else if (a <= 27) ageBins['23–27']++;
+    else if (a <= 35) ageBins['28–35']++;
+    else ageBins['36+']++;
+  });
+  makeChart('chart-age', 'bar', ageBins);
+
+  makeChart('chart-medical', 'doughnut', count(students, 'has_medical_condition'));
+  makeChart('chart-family', 'doughnut', count(students, 'family_support'));
+  makeChart('chart-psych', 'doughnut', count(students, 'has_psychiatric_diagnosis'));
+  makeChart('chart-zone', 'doughnut', count(students, 'zone'));
+  makeChart('chart-life', 'bar', count(students, 'life_satisfaction'));
+}
+
+document.querySelector('#charts-tab-btn').addEventListener('shown.bs.tab', buildCharts);
+document.getElementById('btn-refresh-charts').addEventListener('click', buildCharts);
+
+loadStudents();
+</script>
+{% endblock %}

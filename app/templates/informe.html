@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Informe de Gestión — Centro de Escucha Unadista</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f4fb; color: #1a1a2e; font-size: 13px; }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      position: sticky; top: 0; z-index: 100;
+      background: #1e2a45; color: #fff;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: .6rem 1.5rem; gap: 1rem;
+    }
+    .toolbar a { color: rgba(255,255,255,.75); text-decoration: none; font-size: .85rem; }
+    .toolbar a:hover { color: #fff; }
+    .btn-print {
+      background: #C25A00; color: #fff; border: none; border-radius: 6px;
+      padding: .45rem 1.1rem; font-size: .85rem; font-weight: 600; cursor: pointer;
+      display: flex; align-items: center; gap: .4rem;
+    }
+    .btn-print:hover { background: #a34d00; }
+    #loading-banner {
+      background: #fffbe6; border-bottom: 1px solid #ffe58f;
+      padding: .5rem 1.5rem; font-size: .82rem; color: #7a5c00;
+      display: flex; align-items: center; gap: .5rem;
+    }
+
+    /* ── Informe wrapper ── */
+    .informe-wrap { max-width: 860px; margin: 2rem auto; padding: 0 1rem 3rem; }
+    .informe-page { background: #fff; border-radius: 10px; box-shadow: 0 6px 30px rgba(0,0,0,.12); overflow: hidden; }
+
+    /* ── Header ── */
+    .inf-header {
+      background: linear-gradient(135deg, #1e2a45 0%, #4472C4 100%);
+      color: #fff; padding: 2.2rem 2.5rem 1.8rem;
+    }
+    .inf-header .inst-tag {
+      font-size: .7rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+      color: rgba(255,255,255,.6); margin-bottom: .5rem;
+    }
+    .inf-header h1 { font-size: 1.55rem; font-weight: 800; line-height: 1.2; margin-bottom: .3rem; }
+    .inf-header h2 { font-size: .95rem; font-weight: 400; color: rgba(255,255,255,.8); }
+    .inf-header .meta { margin-top: 1.2rem; display: flex; gap: 2rem; flex-wrap: wrap; }
+    .inf-header .meta-item { font-size: .78rem; color: rgba(255,255,255,.7); }
+    .inf-header .meta-item strong { display: block; color: #fff; font-size: .88rem; }
+
+    /* ── KPI strip ── */
+    .kpi-strip {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      border-bottom: 1px solid #e8eef8;
+    }
+    .kpi-cell {
+      padding: 1.1rem 1rem; text-align: center;
+      border-right: 1px solid #e8eef8;
+    }
+    .kpi-cell:last-child { border-right: none; }
+    .kpi-cell .kpi-n { font-size: 2rem; font-weight: 800; line-height: 1; color: #1e2a45; }
+    .kpi-cell .kpi-l { font-size: .7rem; color: #6c757d; margin-top: .2rem; text-transform: uppercase; letter-spacing: .05em; }
+    .kpi-cell .kpi-n.orange { color: #C25A00; }
+    .kpi-cell .kpi-n.green { color: #198754; }
+    .kpi-cell .kpi-n.red { color: #dc3545; }
+
+    /* ── Sections ── */
+    .inf-body { padding: 0 2.5rem 2.5rem; }
+    .inf-section { margin-top: 2rem; }
+    .inf-section-title {
+      font-size: .7rem; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .12em; color: #4472C4;
+      border-bottom: 2px solid #4472C4; padding-bottom: .35rem;
+      margin-bottom: 1.1rem; display: flex; align-items: center; gap: .4rem;
+    }
+    .inf-section-title .num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: #4472C4; color: #fff; font-size: .65rem; flex-shrink: 0;
+    }
+    .summary-text {
+      font-size: .9rem; line-height: 1.75; color: #333;
+      background: #f8f9fc; border-left: 3px solid #4472C4;
+      padding: 1rem 1.2rem; border-radius: 0 6px 6px 0;
+    }
+    .chart-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin-top: 1rem; }
+    .chart-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.2rem; margin-top: 1rem; }
+    .chart-box { border: 1px solid #e8eef8; border-radius: 8px; padding: 1rem; }
+    .chart-box .chart-title { font-size: .72rem; font-weight: 700; color: #6c757d; text-transform: uppercase; letter-spacing: .07em; margin-bottom: .7rem; }
+    .chart-full { border: 1px solid #e8eef8; border-radius: 8px; padding: 1rem; margin-top: 1.2rem; }
+    .result-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: .8rem; margin-top: 1rem; }
+    .result-card { border-radius: 8px; padding: .9rem .6rem; text-align: center; }
+    .result-card .r-n { font-size: 1.9rem; font-weight: 800; line-height: 1; }
+    .result-card .r-l { font-size: .68rem; color: #555; margin-top: .2rem; }
+    .result-card.green { background: #d1e7dd; }
+    .result-card.red { background: #f8d7da; }
+    .result-card.orange { background: #ffe5cc; }
+    .result-card.dark-red { background: #f8d7da; }
+    .result-card.teal { background: #d1e7dd; }
+    .conclusions-text {
+      font-size: .9rem; line-height: 1.75; color: #333;
+      background: #fffdf5; border: 1px solid #ffe58f;
+      padding: 1rem 1.2rem; border-radius: 6px;
+    }
+
+    /* ── Footer ── */
+    .inf-footer {
+      margin-top: 2.5rem; padding-top: 1.5rem;
+      border-top: 1px solid #e8eef8;
+      display: flex; justify-content: space-between; align-items: flex-end;
+    }
+    .inf-footer .signature-block { text-align: center; }
+    .inf-footer .sig-line { border-top: 1px solid #444; width: 200px; margin: 0 auto .4rem; }
+    .inf-footer .sig-name { font-size: .82rem; font-weight: 600; }
+    .inf-footer .sig-role { font-size: .72rem; color: #6c757d; }
+    .inf-footer .report-date { font-size: .75rem; color: #aaa; text-align: right; }
+    .funnel-wrap { margin-top: .5rem; }
+    .funnel-item { margin-bottom: .6rem; }
+    .funnel-bar-wrap { background: #f0f4fb; border-radius: 4px; overflow: hidden; height: 26px; }
+    .funnel-bar-inner { height: 100%; display: flex; align-items: center; padding: 0 .6rem; font-size: .75rem; font-weight: 700; color: #fff; border-radius: 4px; transition: width .5s; }
+    .funnel-meta { display: flex; justify-content: space-between; font-size: .72rem; color: #555; margin-bottom: .25rem; }
+
+    /* ── Print ── */
+    @media print {
+      @page { size: A4; margin: 1.2cm 1.4cm; }
+      body { background: white !important; }
+      .toolbar, #loading-banner { display: none !important; }
+      .informe-wrap { margin: 0; padding: 0; max-width: 100%; }
+      .informe-page { box-shadow: none !important; border-radius: 0 !important; }
+      .inf-section { page-break-inside: avoid; }
+      .kpi-strip { page-break-inside: avoid; }
+      .chart-grid-2, .chart-grid-3 { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Toolbar -->
+<div class="toolbar d-print-none">
+  <a href="/reportes"><i class="bi bi-arrow-left me-1"></i>Volver a Reportes</a>
+  <button class="btn-print" onclick="window.print()">
+    <i class="bi bi-printer"></i> Imprimir / Guardar PDF
+  </button>
+</div>
+<div id="loading-banner">
+  <i class="bi bi-hourglass-split"></i> Cargando datos del informe…
+</div>
+
+<!-- Informe -->
+<div class="informe-wrap">
+  <div class="informe-page">
+
+    <!-- Header -->
+    <div class="inf-header">
+      <div class="inst-tag">Ministerio de Educación · UNAD</div>
+      <h1>Informe de Gestión<br>del Proceso de Escucha</h1>
+      <h2>Centro de Escucha Unadista &mdash; CIP Dosquebradas</h2>
+      <div class="meta">
+        <div class="meta-item"><strong id="hd-period">—</strong>Período</div>
+        <div class="meta-item"><strong id="hd-calls">—</strong>Llamadas realizadas</div>
+        <div class="meta-item"><strong id="hd-students">—</strong>Estudiantes contactados</div>
+        <div class="meta-item"><strong id="hd-date">—</strong>Fecha del informe</div>
+      </div>
+    </div>
+
+    <!-- KPI strip -->
+    <div class="kpi-strip">
+      <div class="kpi-cell"><div class="kpi-n" id="kpi-total">—</div><div class="kpi-l">Llamadas totales</div></div>
+      <div class="kpi-cell"><div class="kpi-n orange" id="kpi-interviewed">—</div><div class="kpi-l">Entrevistados</div></div>
+      <div class="kpi-cell"><div class="kpi-n green" id="kpi-accepted">—</div><div class="kpi-l">Aceptaron seguimiento</div></div>
+      <div class="kpi-cell"><div class="kpi-n red" id="kpi-critical">—</div><div class="kpi-l">Casos críticos</div></div>
+    </div>
+
+    <div class="inf-body">
+
+      <!-- Section 1: Resumen ejecutivo -->
+      <div class="inf-section">
+        <div class="inf-section-title"><span class="num">1</span>Resumen ejecutivo</div>
+        <p class="summary-text" id="executive-text">Cargando…</p>
+      </div>
+
+      <!-- Section 2: Gestión de llamadas -->
+      <div class="inf-section">
+        <div class="inf-section-title"><span class="num">2</span>Gestión de llamadas</div>
+        <div class="funnel-wrap" id="inf-funnel"></div>
+        <div class="chart-grid-2">
+          <div class="chart-box">
+            <div class="chart-title">Distribución de resultados</div>
+            <canvas id="inf-outcome" height="190"></canvas>
+          </div>
+          <div class="chart-box">
+            <div class="chart-title">Llamadas por día</div>
+            <canvas id="inf-timeline" height="190"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 3: Perfil demográfico -->
+      <div class="inf-section" id="section-demo" style="display:none">
+        <div class="inf-section-title"><span class="num">3</span>Perfil demográfico de la población contactada</div>
+        <div class="chart-grid-3">
+          <div class="chart-box">
+            <div class="chart-title">Distribución por sexo</div>
+            <canvas id="inf-sex" height="180"></canvas>
+          </div>
+          <div class="chart-box">
+            <div class="chart-title">Estrato socioeconómico</div>
+            <canvas id="inf-strata" height="180"></canvas>
+          </div>
+          <div class="chart-box">
+            <div class="chart-title">Zona</div>
+            <canvas id="inf-zone" height="180"></canvas>
+          </div>
+        </div>
+        <div class="chart-full">
+          <div class="chart-title">Top ciudades</div>
+          <canvas id="inf-cities" height="90"></canvas>
+        </div>
+      </div>
+
+      <!-- Section 4: Resultados -->
+      <div class="inf-section" id="section-results" style="display:none">
+        <div class="inf-section-title"><span class="num">4</span>Resultados del acompañamiento</div>
+        <div class="result-grid">
+          <div class="result-card green"><div class="r-n" id="res-accepted">—</div><div class="r-l">Aceptaron seguimiento</div></div>
+          <div class="result-card red"><div class="r-n" id="res-refused">—</div><div class="r-l">Rechazaron seguimiento</div></div>
+          <div class="result-card orange"><div class="r-n" id="res-psycho">—</div><div class="r-l">Acompañamiento psicosocial</div></div>
+          <div class="result-card dark-red"><div class="r-n" id="res-critical">—</div><div class="r-l">Casos críticos</div></div>
+          <div class="result-card teal"><div class="r-n" id="res-referred">—</div><div class="r-l">Remitidos</div></div>
+        </div>
+      </div>
+
+      <!-- Section 5: Hallazgos de entrevistas -->
+      <div class="inf-section" id="section-iv" style="display:none">
+        <div class="inf-section-title"><span class="num">5</span>Hallazgos de entrevistas</div>
+        <div class="chart-grid-3">
+          <div class="chart-box">
+            <div class="chart-title">Horas de estudio por día</div>
+            <canvas id="inf-study" height="185"></canvas>
+          </div>
+          <div class="chart-box">
+            <div class="chart-title">Autonomía en virtualidad</div>
+            <canvas id="inf-autonomy" height="185"></canvas>
+          </div>
+          <div class="chart-box">
+            <div class="chart-title">Motivación semestre (1–5)</div>
+            <canvas id="inf-motivation" height="185"></canvas>
+          </div>
+        </div>
+        <div class="chart-full">
+          <div class="chart-title">Acceso a herramientas digitales</div>
+          <canvas id="inf-tools" height="70"></canvas>
+        </div>
+      </div>
+
+      <!-- Section 6: Conclusiones -->
+      <div class="inf-section">
+        <div class="inf-section-title"><span class="num" id="conclusions-num">6</span>Conclusiones y recomendaciones</div>
+        <p class="conclusions-text" id="conclusions-text">Cargando…</p>
+      </div>
+
+      <!-- Footer -->
+      <div class="inf-footer">
+        <div class="signature-block">
+          <div class="sig-line"></div>
+          <div class="sig-name">Vivian Juliana Osorio</div>
+          <div class="sig-role">Psicóloga &mdash; Centro de Escucha Unadista</div>
+        </div>
+        <div class="report-date" id="footer-date"></div>
+      </div>
+
+    </div><!-- /inf-body -->
+  </div><!-- /informe-page -->
+</div><!-- /informe-wrap -->
+
+<script>
+const OUTCOME_COLORS_MAP = {
+  'No contestó': '#adb5bd',
+  'No pudo hablar': '#ffc107',
+  'Conversación completa': '#4472C4',
+  'Caso crítico': '#dc3545',
+};
+const BLUE_PAL = ['#1e2a45','#4472C4','#5d8cd0','#8aabd8','#b5c9e8','#d8e4f3'];
+const TEAL_PAL = ['#0a6b5d','#198754','#57be90','#b5ead0'];
+const MOT_COLORS = ['#dc3545','#fd7e14','#ffc107','#20c997','#198754'];
+
+function n(v) { return `<strong>${v}</strong>`; }
+function pct(a, b) { return b > 0 ? Math.round(a / b * 100) : 0; }
+
+function infChart(id, config) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  config.options = config.options || {};
+  config.options.animation = false;
+  config.options.plugins = config.options.plugins || {};
+  config.options.plugins.legend = config.options.plugins.legend || {};
+  new Chart(el, config);
+}
+
+async function init() {
+  const data = await fetch('/api/reports/charts').then(r => r.json());
+  document.getElementById('loading-banner').style.display = 'none';
+
+  const { period, funnel, calls, students, demographics, results, interview_findings } = data;
+
+  // Header
+  if (period.first_call && period.last_call) {
+    document.getElementById('hd-period').textContent = `${period.first_call} — ${period.last_call}`;
+  } else {
+    document.getElementById('hd-period').textContent = 'Sin datos';
+  }
+  document.getElementById('hd-calls').textContent = calls.total;
+  document.getElementById('hd-students').textContent = students.total_contacted;
+  document.getElementById('hd-date').textContent = period.report_date;
+  document.getElementById('footer-date').textContent = `Generado el ${period.report_date}`;
+
+  // KPI strip
+  document.getElementById('kpi-total').textContent = calls.total;
+  document.getElementById('kpi-interviewed').textContent = students.total_interviews;
+  document.getElementById('kpi-accepted').textContent = results.accepted_support;
+  document.getElementById('kpi-critical').textContent = results.critical_cases;
+
+  // Executive summary
+  document.getElementById('executive-text').innerHTML = generateSummary(data);
+
+  // Funnel
+  renderFunnel(funnel);
+
+  // Outcome chart
+  const outLabels = Object.keys(calls.by_outcome);
+  infChart('inf-outcome', {
+    type: 'doughnut',
+    data: { labels: outLabels, datasets: [{ data: Object.values(calls.by_outcome), backgroundColor: outLabels.map(l => OUTCOME_COLORS_MAP[l] || '#adb5bd'), borderWidth: 2 }] },
+    options: { cutout: '58%', plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } } } }
+  });
+
+  // Timeline
+  const dates = calls.by_date;
+  infChart('inf-timeline', {
+    type: 'line',
+    data: {
+      labels: dates.map(d => d.date),
+      datasets: [{ label: 'Llamadas', data: dates.map(d => d.count), borderColor: '#4472C4', backgroundColor: 'rgba(68,114,196,.1)', fill: true, tension: .35, pointRadius: 2 }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 9 }, maxTicksLimit: 10 } }, y: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+
+  // Demographics
+  if (students.total_contacted > 0) {
+    document.getElementById('section-demo').style.display = '';
+    const demo = demographics;
+
+    infChart('inf-sex', {
+      type: 'doughnut',
+      data: { labels: Object.keys(demo.by_sex), datasets: [{ data: Object.values(demo.by_sex), backgroundColor: BLUE_PAL, borderWidth: 2 }] },
+      options: { cutout: '52%', plugins: { legend: { position: 'bottom', labels: { font: { size: 9 }, boxWidth: 10 } } } }
+    });
+    infChart('inf-strata', {
+      type: 'bar',
+      data: { labels: Object.keys(demo.by_strata).map(k => `Est. ${k}`), datasets: [{ data: Object.values(demo.by_strata), backgroundColor: BLUE_PAL, borderRadius: 4 }] },
+      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0, font: { size: 9 } } }, x: { ticks: { font: { size: 9 } } } } }
+    });
+    infChart('inf-zone', {
+      type: 'doughnut',
+      data: { labels: Object.keys(demo.by_zone), datasets: [{ data: Object.values(demo.by_zone), backgroundColor: TEAL_PAL, borderWidth: 2 }] },
+      options: { cutout: '52%', plugins: { legend: { position: 'bottom', labels: { font: { size: 9 }, boxWidth: 10 } } } }
+    });
+    const cities = demo.top_cities;
+    infChart('inf-cities', {
+      type: 'bar',
+      data: { labels: cities.map(c => c.city), datasets: [{ data: cities.map(c => c.count), backgroundColor: '#4472C4', borderRadius: 4 }] },
+      options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0, font: { size: 9 } } }, y: { ticks: { font: { size: 9 } } } } }
+    });
+  }
+
+  // Results
+  if (students.total_interviews > 0) {
+    document.getElementById('section-results').style.display = '';
+    document.getElementById('res-accepted').textContent = results.accepted_support;
+    document.getElementById('res-refused').textContent = results.refused_support;
+    document.getElementById('res-psycho').textContent = results.psychosocial_accompaniment;
+    document.getElementById('res-critical').textContent = results.critical_cases;
+    document.getElementById('res-referred').textContent = results.referred;
+
+    document.getElementById('section-iv').style.display = '';
+    const iv = interview_findings;
+
+    infChart('inf-study', {
+      type: 'doughnut',
+      data: { labels: Object.keys(iv.study_hours), datasets: [{ data: Object.values(iv.study_hours), backgroundColor: BLUE_PAL, borderWidth: 2 }] },
+      options: { cutout: '52%', plugins: { legend: { position: 'bottom', labels: { font: { size: 9 }, boxWidth: 10 } } } }
+    });
+    infChart('inf-autonomy', {
+      type: 'bar',
+      data: { labels: ['Buena','Regular','Mala'], datasets: [{ data: Object.values(iv.autonomy), backgroundColor: ['#198754','#ffc107','#dc3545'], borderRadius: 4 }] },
+      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0, font: { size: 9 } } }, x: { ticks: { font: { size: 9 } } } } }
+    });
+    infChart('inf-motivation', {
+      type: 'bar',
+      data: { labels: ['1','2','3','4','5'], datasets: [{ data: Object.values(iv.motivation_dist), backgroundColor: MOT_COLORS, borderRadius: 4 }] },
+      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0, font: { size: 9 } } }, x: { ticks: { font: { size: 9 } } } } }
+    });
+    infChart('inf-tools', {
+      type: 'bar',
+      data: {
+        labels: ['Teams', 'Correo institucional'],
+        datasets: [
+          { label: 'Sí', data: [iv.teams['Sí'], iv.email['Sí']], backgroundColor: '#198754', borderRadius: 4 },
+          { label: 'No', data: [iv.teams['No'], iv.email['No']], backgroundColor: '#dc3545', borderRadius: 4 },
+        ]
+      },
+      options: { plugins: { legend: { position: 'right', labels: { font: { size: 10 }, boxWidth: 12 } } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+    });
+
+    // Adjust section numbers if demo section is hidden
+    if (students.total_contacted === 0) {
+      document.getElementById('conclusions-num').textContent = '4';
+    }
+  } else {
+    document.getElementById('conclusions-num').textContent =
+      students.total_contacted > 0 ? '4' : '3';
+  }
+
+  document.getElementById('conclusions-text').innerHTML = generateConclusions(data);
+}
+
+function renderFunnel(f) {
+  const max = Math.max(f.total_students, 1);
+  const steps = [
+    { label: 'Estudiantes en listas', value: f.total_students, color: '#1e2a45' },
+    { label: 'Contactados con llamada', value: f.contacted, color: '#4472C4' },
+    { label: 'Participaron en entrevista', value: f.with_interview, color: '#C25A00' },
+    { label: 'Aceptaron seguimiento', value: f.accepted, color: '#198754' },
+  ];
+  document.getElementById('inf-funnel').innerHTML = steps.map((s, i) => {
+    const w = Math.max(Math.round(s.value / max * 100), 3);
+    const sub = i > 0 && f.total_students > 0
+      ? ` · ${pct(s.value, f.total_students)}% del total`
+      : '';
+    return `
+      <div class="funnel-item">
+        <div class="funnel-meta"><span>${s.label}</span><span><strong>${s.value}</strong>${sub}</span></div>
+        <div class="funnel-bar-wrap">
+          <div class="funnel-bar-inner" style="width:${w}%;background:${s.color}">${s.value}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function generateSummary(data) {
+  const { calls, students, results, period, funnel } = data;
+  const total = calls.total;
+  const contacted = students.total_contacted;
+  const interviews = students.total_interviews;
+  const ivPct = pct(interviews, contacted);
+  const { accepted_support: accepted, critical_cases: critical, psychosocial_accompaniment: psycho } = results;
+
+  if (!total) return 'Aún no se han registrado llamadas.';
+
+  const periodStr = period.first_call && period.last_call
+    ? `Durante el período comprendido entre el <strong>${period.first_call}</strong> y el <strong>${period.last_call}</strong>`
+    : 'A la fecha de generación de este informe';
+
+  return `${periodStr}, el Centro de Escucha Unadista – CIP Dosquebradas realizó ${n(total)} llamada(s) de seguimiento telefónico, logrando contactar a ${n(contacted)} estudiante(s) matriculado(s). De estos, el ${n(ivPct + '%')} (${n(interviews)} estudiante(s)) participaron en una conversación completa de seguimiento académico y psicosocial. ${n(accepted)} estudiante(s) aceptaron continuar con el proceso de acompañamiento. A lo largo del proceso, ${n(critical)} caso(s) crítico(s) requirieron atención prioritaria, y ${n(psycho)} estudiante(s) necesitaron acompañamiento psicosocial puntual durante la sesión.`;
+}
+
+function generateConclusions(data) {
+  const { calls, students, demographics, results, interview_findings } = data;
+  const total = calls.total;
+  if (!total) return 'Sin datos suficientes para generar conclusiones.';
+
+  const contacted = students.total_contacted;
+  const interviews = students.total_interviews;
+  const ivPct = pct(interviews, contacted);
+  const accPct = pct(results.accepted_support, interviews);
+
+  const lines = [];
+
+  lines.push(`Los resultados del proceso de llamadas reflejan que el <strong>${ivPct}%</strong> de los estudiantes contactados participó en la entrevista completa, y de estos el <strong>${accPct}%</strong> aceptó continuar con el proceso de acompañamiento psicosocial.`);
+
+  const aut = interview_findings.autonomy;
+  const autTotal = (aut['Buena'] || 0) + (aut['Regular'] || 0) + (aut['Mala'] || 0);
+  if (autTotal > 0) {
+    const bPct = pct(aut['Buena'] || 0, autTotal);
+    const mPct = pct(aut['Mala'] || 0, autTotal);
+    lines.push(`Respecto a la autonomía en virtualidad, el <strong>${bPct}%</strong> de los estudiantes entrevistados reportó una buena autonomía, mientras que el <strong>${mPct}%</strong> indicó dificultades significativas en este aspecto, lo cual sugiere una necesidad de acompañamiento en competencias digitales.`);
+  }
+
+  const avg = interview_findings.motivation_avg;
+  if (avg !== null) {
+    let motDesc = avg >= 4 ? 'alto' : avg >= 3 ? 'moderado' : 'bajo';
+    lines.push(`El promedio de motivación para continuar el semestre fue de <strong>${avg}/5</strong>, lo que representa un nivel <strong>${motDesc}</strong> de compromiso académico percibido.`);
+  }
+
+  const teams = interview_findings.teams;
+  const teamsTotal = (teams['Sí'] || 0) + (teams['No'] || 0);
+  if (teamsTotal > 0) {
+    const tPct = pct(teams['Sí'] || 0, teamsTotal);
+    const email = interview_findings.email;
+    const ePct = pct(email['Sí'] || 0, (email['Sí'] || 0) + (email['No'] || 0));
+    lines.push(`En cuanto al acceso a herramientas institucionales, el <strong>${tPct}%</strong> de los estudiantes ya maneja Teams y el <strong>${ePct}%</strong> accede al correo institucional.`);
+  }
+
+  const topCity = demographics.top_cities?.[0];
+  if (topCity) {
+    lines.push(`Demográficamente, la ciudad con mayor representación en la población contactada fue <strong>${topCity.city}</strong> (${topCity.count} estudiante(s)).`);
+  }
+
+  if (results.critical_cases > 0) {
+    lines.push(`Se identificaron <strong>${results.critical_cases}</strong> caso(s) crítico(s) que requirieron atención inmediata y derivación prioritaria.`);
+  }
+
+  lines.push(`Se recomienda dar continuidad al proceso de seguimiento académico y psicosocial con los estudiantes aún en proceso, con especial atención a quienes reportaron baja autonomía virtual, niveles de motivación reducidos y dificultades de acceso a las plataformas institucionales.`);
+
+  return lines.map(l => `<p style="margin-bottom:.7rem">${l}</p>`).join('');
+}
+
+init();
+</script>
+</body>
+</html>

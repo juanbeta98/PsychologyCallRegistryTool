@@ -1,0 +1,47 @@
+# ── Datos sensibles ──────────────────────────────────────────────────────────
+# La base de datos contiene información personal de estudiantes (Ley 1581/2012)
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Listas de estudiantes importadas (contienen datos personales)
+uploads/*.xlsx
+uploads/*.xls
+uploads/*.csv
+
+# Reportes exportados (contienen datos personales)
+reports/*.xlsx
+reports/*.xls
+reports/*.csv
+
+# ── Sistema macOS ─────────────────────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+._*
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Entornos virtuales (el venv vive en ~/.psicologia_app_venv, fuera del repo)
+venv/
+.venv/
+env/
+.env
+
+# ── Empaquetado ───────────────────────────────────────────────────────────────
+*.zip
+*.tar.gz
+
+# ── IDE / Editor ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Claude Code ───────────────────────────────────────────────────────────────
+.claude/

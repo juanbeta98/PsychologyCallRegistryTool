@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Importar lista{% endblock %}
+
+{% block content %}
+<h4 class="fw-bold mb-4" style="color:#1e2a45"><i class="bi bi-upload me-2" style="color:#4472C4"></i>Importar lista de estudiantes</h4>
+
+{% if step == 'upload' %}
+<div class="row">
+  <div class="col-md-7">
+    <div class="card border-0 shadow-sm mb-4" style="border-radius:10px">
+      <div class="card-body">
+        <form method="POST" enctype="multipart/form-data">
+          <input type="hidden" name="action" value="preview">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Archivo Excel (.xlsx)</label>
+            <input type="file" name="excel_file" class="form-control" accept=".xlsx,.xls" required>
+          </div>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-search me-1"></i>Vista previa</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-5">
+    <div class="card border-0 shadow-sm" style="border-radius:10px">
+      <div class="card-body">
+        <div class="section-title">Listas importadas</div>
+        {% if batches %}
+          {% for b in batches %}
+          <div class="mb-2 small p-2 rounded" style="background:{{ '#d1e7dd' if b.is_active else '#f8d7da' }}">
+            <div class="fw-semibold text-truncate" title="{{ b.filename }}">{{ b.filename }}</div>
+            <div class="text-muted">{{ b.student_count }} estudiantes · vigencia {{ b.validity_date }}</div>
+            <span class="badge {{ 'bg-success' if b.is_active else 'bg-secondary' }}">{{ 'Activa' if b.is_active else 'Vencida' }}</span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p class="text-muted small">Sin listas importadas aún.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% elif step == 'confirm' %}
+<div class="card border-0 shadow-sm" style="border-radius:10px;max-width:720px">
+  <div class="card-body">
+    <h5 class="fw-semibold mb-3">{{ filename }}</h5>
+    <div class="row g-2 mb-3">
+      <div class="col-4">
+        <div class="p-2 rounded text-center" style="background:#d1e7dd">
+          <div class="fw-bold fs-4 text-success">{{ new_count }}</div>
+          <div class="small">Estudiantes nuevos</div>
+        </div>
+      </div>
+      <div class="col-4">
+        <div class="p-2 rounded text-center" style="background:#fff3cd">
+          <div class="fw-bold fs-4 text-warning">{{ dup_count }}</div>
+          <div class="small">Ya existen (omitir)</div>
+        </div>
+      </div>
+      <div class="col-4">
+        <div class="p-2 rounded text-center" style="background:#f0f4fc">
+          <div class="fw-bold fs-4 text-primary">{{ total }}</div>
+          <div class="small">Total en archivo</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mb-3 small text-muted">Vista previa (primeras 5 filas):</div>
+    <div class="table-responsive mb-3" style="max-height:180px;overflow:auto;font-size:.75rem">
+      <table class="table table-sm table-bordered">
+        <thead><tr>{% for c in ['Doc','Estudiante','Escuela','Programa','Edad','Sexo'] %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+        <tbody>
+          {% for row in preview %}
+          <tr>
+            <td>{{ row.get('Doc','') }}</td>
+            <td>{{ row.get('Estudiante','') }}</td>
+            <td>{{ row.get('Escuela','') }}</td>
+            <td>{{ row.get('Programa','') }}</td>
+            <td>{{ row.get('Edad','') }}</td>
+            <td>{{ row.get('Sexo','') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <form method="POST">
+      <input type="hidden" name="action" value="confirm">
+      <input type="hidden" name="filepath" value="{{ filepath }}">
+      <input type="hidden" name="filename" value="{{ filename }}">
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Fecha de vigencia de esta lista <span class="text-danger">*</span></label>
+        <input type="date" name="validity_date" class="form-control" required style="max-width:220px">
+        <div class="form-text">Después de esta fecha, los estudiantes de esta lista quedarán inactivos.</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Notas (opcional)</label>
+        <input type="text" name="notes" class="form-control" placeholder="Ej: Nuevos estudiantes semestre 2025-2">
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-success"><i class="bi bi-check-lg me-1"></i>Confirmar importación</button>
+        <a href="/importar" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

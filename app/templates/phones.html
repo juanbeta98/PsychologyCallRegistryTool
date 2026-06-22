@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% block title %}Teléfonos{% endblock %}
+
+{% block head %}
+<style>
+  .phone-row {
+    display: flex; align-items: center; gap: .75rem;
+    padding: .6rem .75rem; border-radius: 8px;
+    background: #f8f9fa; margin-bottom: .4rem;
+    transition: background .15s;
+  }
+  .phone-row:hover { background: #eef3fc; }
+  .phone-row.saved { opacity: .5; background: #d1e7dd; }
+  .student-info { min-width: 0; flex: 1; }
+  .student-info .name { font-weight: 600; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .student-info .meta { font-size: .75rem; color: #6c757d; }
+  .phone-input-wrap { display: flex; gap: .4rem; align-items: center; flex-shrink: 0; }
+  .phone-input-wrap input { width: 170px; }
+  .saved-tick { color: #198754; font-size: .85rem; white-space: nowrap; }
+  .search-bar { max-width: 360px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-1 gap-3">
+  <h4 class="fw-bold mb-0" style="color:#1e2a45">
+    <i class="bi bi-phone-fill me-2" style="color:#4472C4"></i>Registro de Teléfonos
+  </h4>
+</div>
+<p class="text-muted small mb-3">
+  Solo aparecen los estudiantes que ya están <strong>marcados para llamar</strong>.
+  Consulta la plataforma de la universidad e ingresa el número de cada uno.
+</p>
+
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-pending-phones" id="tab-pending-btn">
+      <i class="bi bi-exclamation-circle me-1 text-warning"></i>Sin teléfono
+      <span class="badge bg-warning text-dark ms-1" id="pending-count">…</span>
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-registered-phones" id="tab-registered-btn">
+      <i class="bi bi-check-circle me-1 text-success"></i>Con teléfono
+      <span class="badge bg-success ms-1" id="registered-count">…</span>
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content">
+
+  <!-- ── Sin teléfono ── -->
+  <div class="tab-pane fade show active" id="tab-pending-phones">
+    <div class="card border-0 shadow-sm" style="border-radius:10px">
+      <div class="card-body">
+        <div class="d-flex gap-2 align-items-center mb-3">
+          <div class="input-group search-bar">
+            <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+            <input type="text" id="search-pending" class="form-control" placeholder="Buscar por nombre o documento…">
+          </div>
+          <span class="text-muted small" id="pending-visible-count"></span>
+        </div>
+        <div id="pending-phones-list"></div>
+        <div id="pending-empty" class="text-muted small d-none">
+          <i class="bi bi-check-circle-fill text-success me-1"></i>
+          Todos los estudiantes marcados tienen teléfono registrado.
+          Si acabas de marcar nuevos estudiantes, recarga la página.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Con teléfono ── -->
+  <div class="tab-pane fade" id="tab-registered-phones">
+    <div class="card border-0 shadow-sm" style="border-radius:10px">
+      <div class="card-body">
+        <div class="d-flex gap-2 align-items-center mb-3">
+          <div class="input-group search-bar">
+            <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+            <input type="text" id="search-registered" class="form-control" placeholder="Buscar por nombre o documento…">
+          </div>
+          <span class="text-muted small" id="registered-visible-count"></span>
+        </div>
+        <div id="registered-phones-list"></div>
+        <div id="registered-empty" class="text-muted small d-none">
+          No hay teléfonos registrados aún. Ve a la pestaña "Sin teléfono" para ingresar los números.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let pendingStudents = [];
+let registeredStudents = [];
+
+// ─── Load pending ─────────────────────────────────────────────
+async function loadPending() {
+  pendingStudents = await fetch('/api/phones/pending').then(r => r.json());
+  document.getElementById('pending-count').textContent = pendingStudents.length;
+  renderPending(pendingStudents);
+}
+
+function renderPending(students) {
+  const el = document.getElementById('pending-phones-list');
+  const empty = document.getElementById('pending-empty');
+  document.getElementById('pending-visible-count').textContent =
+    students.length ? `${students.length} estudiantes` : '';
+
+  if (!students.length) {
+    el.innerHTML = '';
+    empty.classList.remove('d-none');
+    return;
+  }
+  empty.classList.add('d-none');
+
+  el.innerHTML = students.map(s => `
+    <div class="phone-row" id="phone-row-${s.id}">
+      <div class="student-info">
+        <div class="name">${s.full_name}</div>
+        <div class="meta">${s.doc_number} &middot; ${s.school} &middot; ${s.program}</div>
+      </div>
+      <div class="phone-input-wrap">
+        <input type="tel" class="form-control form-control-sm" id="phone-input-${s.id}"
+          placeholder="3001234567" inputmode="numeric"
+          onkeydown="if(event.key==='Enter') savePhone(${s.id})">
+        <button class="btn btn-sm btn-primary" onclick="savePhone(${s.id})">
+          <i class="bi bi-floppy"></i>
+        </button>
+        <span class="saved-tick d-none" id="saved-${s.id}">
+          <i class="bi bi-check-circle-fill"></i> Guardado
+        </span>
+      </div>
+    </div>`).join('');
+}
+
+async function savePhone(studentId) {
+  const input = document.getElementById(`phone-input-${studentId}`);
+  const phone = input.value.trim();
+  if (!phone) { input.classList.add('is-invalid'); input.focus(); return; }
+  input.classList.remove('is-invalid');
+
+  const res = await fetch(`/api/phones/${studentId}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({phone}),
+  });
+  if (!res.ok) { alert((await res.json()).error); return; }
+
+  const row = document.getElementById(`phone-row-${studentId}`);
+  row.classList.add('saved');
+  document.getElementById(`saved-${studentId}`).classList.remove('d-none');
+
+  // Update counts
+  const countEl = document.getElementById('pending-count');
+  const newCount = Math.max(0, parseInt(countEl.textContent) - 1);
+  countEl.textContent = newCount;
+  const regCount = document.getElementById('registered-count');
+  regCount.textContent = parseInt(regCount.textContent || '0') + 1;
+
+  setTimeout(() => {
+    row.remove();
+    pendingStudents = pendingStudents.filter(s => s.id !== studentId);
+    if (!document.querySelectorAll('.phone-row').length) {
+      document.getElementById('pending-empty').classList.remove('d-none');
+      document.getElementById('pending-visible-count').textContent = '';
+    }
+  }, 1000);
+}
+
+// ─── Search pending ───────────────────────────────────────────
+document.getElementById('search-pending').addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  const filtered = q
+    ? pendingStudents.filter(s =>
+        s.full_name.toLowerCase().includes(q) ||
+        s.doc_number.toLowerCase().includes(q) ||
+        (s.school || '').toLowerCase().includes(q))
+    : pendingStudents;
+  renderPending(filtered);
+});
+
+// ─── Load registered ──────────────────────────────────────────
+async function loadRegistered() {
+  registeredStudents = await fetch('/api/phones/registered').then(r => r.json());
+  document.getElementById('registered-count').textContent = registeredStudents.length;
+  renderRegistered(registeredStudents);
+}
+
+function renderRegistered(students) {
+  const el = document.getElementById('registered-phones-list');
+  const empty = document.getElementById('registered-empty');
+  document.getElementById('registered-visible-count').textContent =
+    students.length ? `${students.length} estudiantes` : '';
+
+  if (!students.length) {
+    el.innerHTML = '';
+    empty.classList.remove('d-none');
+    return;
+  }
+  empty.classList.add('d-none');
+
+  el.innerHTML = students.map(s => `
+    <div class="phone-row" id="reg-row-${s.id}">
+      <div class="student-info">
+        <div class="name">${s.full_name}</div>
+        <div class="meta">${s.doc_number} &middot; ${s.school}</div>
+      </div>
+      <div class="phone-input-wrap">
+        <input type="tel" class="form-control form-control-sm" id="edit-phone-${s.id}"
+          value="${s.phone}" style="width:170px" inputmode="numeric"
+          onkeydown="if(event.key==='Enter') updatePhone(${s.id})">
+        <button class="btn btn-sm btn-outline-primary" onclick="updatePhone(${s.id})" title="Guardar cambio">
+          <i class="bi bi-floppy"></i>
+        </button>
+        <button class="btn btn-sm btn-outline-danger" onclick="deletePhone(${s.id})" title="Eliminar teléfono">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    </div>`).join('');
+}
+
+// ─── Search registered ────────────────────────────────────────
+document.getElementById('search-registered').addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  const filtered = q
+    ? registeredStudents.filter(s =>
+        s.full_name.toLowerCase().includes(q) ||
+        s.doc_number.toLowerCase().includes(q))
+    : registeredStudents;
+  renderRegistered(filtered);
+});
+
+async function updatePhone(studentId) {
+  const phone = document.getElementById(`edit-phone-${studentId}`).value.trim();
+  if (!phone) return;
+  await fetch(`/api/phones/${studentId}`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({phone}),
+  });
+  const row = document.getElementById(`reg-row-${studentId}`);
+  row.style.outline = '2px solid #198754';
+  setTimeout(() => row.style.outline = '', 800);
+}
+
+async function deletePhone(studentId) {
+  if (!confirm('¿Eliminar el número de este estudiante?')) return;
+  await fetch(`/api/phones/${studentId}`, {method:'DELETE'});
+  registeredStudents = registeredStudents.filter(s => s.id !== studentId);
+  loadPending();
+  renderRegistered(registeredStudents);
+  document.getElementById('registered-count').textContent = registeredStudents.length;
+  document.getElementById('pending-count').textContent =
+    parseInt(document.getElementById('pending-count').textContent || '0') + 1;
+}
+
+document.getElementById('tab-registered-btn').addEventListener('shown.bs.tab', loadRegistered);
+
+loadPending();
+</script>
+{% endblock %}

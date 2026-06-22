@@ -1,0 +1,532 @@
+{% extends "base.html" %}
+{% block title %}Histórico{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 class="fw-bold mb-0" style="color:#1e2a45">
+    <i class="bi bi-clock-history me-2" style="color:#4472C4"></i>Histórico de llamadas
+  </h4>
+  <button class="btn btn-sm btn-outline-secondary" onclick="loadHistorico()">
+    <i class="bi bi-arrow-clockwise"></i> Actualizar
+  </button>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div id="historico-loading"><p class="text-muted small mb-0">Cargando…</p></div>
+    <div id="historico-table-wrap" style="display:none">
+      <table id="historico-table" class="table table-hover align-middle" style="width:100%">
+        <thead class="table-light">
+          <tr>
+            <th>Estudiante</th>
+            <th>Documento</th>
+            <th>Programa</th>
+            <th>Estado</th>
+            <th>Llamadas</th>
+            <th>Última llamada</th>
+            <th class="dt-no-sort"></th>
+          </tr>
+        </thead>
+        <tbody id="historico-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Detail modal -->
+<div class="modal fade" id="detailModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#1e2a45;color:#fff">
+        <div>
+          <h5 class="modal-title mb-0" id="detail-student-name"></h5>
+          <div id="detail-student-meta" style="font-size:.8rem;color:rgba(255,255,255,.65);margin-top:.2rem"></div>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="detail-body"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit call modal -->
+<div class="modal fade" id="editCallModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#c25a00;color:#fff">
+        <h5 class="modal-title" id="edit-modal-title"><i class="bi bi-pencil-square me-2"></i></h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Outcome -->
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Resultado de la llamada</label>
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="button" class="btn btn-outline-secondary edit-outcome-btn" data-outcome="no_answer">
+              <i class="bi bi-telephone-x me-1"></i>No contestó
+            </button>
+            <button type="button" class="btn btn-outline-warning edit-outcome-btn" data-outcome="no_time">
+              <i class="bi bi-clock me-1"></i>No pudo hablar
+            </button>
+            <button type="button" class="btn btn-outline-primary edit-outcome-btn" data-outcome="completed">
+              <i class="bi bi-chat-dots me-1"></i>Conversación completa
+            </button>
+            <button type="button" class="btn btn-outline-danger edit-outcome-btn" data-outcome="critical">
+              <i class="bi bi-exclamation-triangle me-1"></i>Caso crítico
+            </button>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Notas de la llamada</label>
+          <textarea class="form-control" id="edit-call-notes" rows="2"></textarea>
+        </div>
+
+        <!-- Rescheduled (shown when no_time) -->
+        <div class="mb-3 d-none" id="edit-reschedule-section">
+          <label class="form-label fw-semibold">Reagendado para</label>
+          <input type="datetime-local" class="form-control" id="edit-reschedule-datetime">
+        </div>
+
+        <!-- Interview section -->
+        <div id="edit-interview-section" class="d-none border-top pt-3 mt-2">
+          <div class="fw-bold mb-3 text-primary"><i class="bi bi-clipboard2-pulse me-1"></i>Entrevista</div>
+
+          <div class="mb-3">
+            <label class="form-label">¿Además de estudiar, qué otra actividad realizas?</label>
+            <input type="text" class="form-control" id="edit-iv-activity">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">¿Cuántas horas dedicas a estudiar por día?</label>
+            <div class="d-flex gap-2 flex-wrap">
+              <button type="button" class="btn btn-outline-secondary edit-iv-option-btn" data-group="edit-study-hours" data-val="1 hora">1 hora</button>
+              <button type="button" class="btn btn-outline-secondary edit-iv-option-btn" data-group="edit-study-hours" data-val="De 2 a 4 horas">De 2 a 4 horas</button>
+              <button type="button" class="btn btn-outline-secondary edit-iv-option-btn" data-group="edit-study-hours" data-val="Más de 4 horas">Más de 4 horas</button>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">¿Cómo describes tu autonomía en la modalidad virtual?</label>
+            <div class="d-flex gap-2 flex-wrap">
+              <button type="button" class="btn btn-outline-success edit-iv-option-btn" data-group="edit-autonomy" data-val="Buena">Buena</button>
+              <button type="button" class="btn btn-outline-warning edit-iv-option-btn" data-group="edit-autonomy" data-val="Regular">Regular</button>
+              <button type="button" class="btn btn-outline-danger edit-iv-option-btn" data-group="edit-autonomy" data-val="Mala">Mala</button>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">¿Qué es lo más difícil para ti de estudiar virtualmente?</label>
+              <textarea class="form-control" id="edit-iv-difficult" rows="2"></textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">¿Qué es lo más fácil para ti de estudiar virtualmente?</label>
+              <textarea class="form-control" id="edit-iv-easy" rows="2"></textarea>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">¿Ya pudo acceder y manejar Teams?</label>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-success edit-iv-option-btn" data-group="edit-teams-access" data-val="true">Sí</button>
+                <button type="button" class="btn btn-outline-danger edit-iv-option-btn" data-group="edit-teams-access" data-val="false">No</button>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">¿Ya pudo acceder y manejar el correo institucional?</label>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-success edit-iv-option-btn" data-group="edit-email-access" data-val="true">Sí</button>
+                <button type="button" class="btn btn-outline-danger edit-iv-option-btn" data-group="edit-email-access" data-val="false">No</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">En este momento, ¿qué tan motivado/a te sientes para continuar tu semestre?</label>
+            <div class="d-flex gap-2 flex-wrap">
+              {% for i in range(1,6) %}
+              <button type="button" class="btn btn-outline-secondary edit-motivation-btn" data-val="{{ i }}">{{ i }}</button>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="mb-3 p-3 rounded" style="background:#fffbe6;border:1px solid #ffe58f">
+            <label class="form-label fw-semibold">Acompañamiento psicosocial</label>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="edit-iv-psico-check">
+              <label class="form-check-label" for="edit-iv-psico-check">Requiere acompañamiento puntual</label>
+            </div>
+            <textarea class="form-control" id="edit-iv-psico-notes" rows="2" placeholder="Comentarios…"></textarea>
+          </div>
+
+          <div class="mb-3 p-3 rounded" style="background:#e8f5e9;border:1px solid #a5d6a7">
+            <label class="form-label fw-semibold">Acompañamiento psicoeducativo</label>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="edit-iv-psicoed-check">
+              <label class="form-check-label" for="edit-iv-psicoed-check">Requiere acompañamiento puntual</label>
+            </div>
+            <textarea class="form-control" id="edit-iv-psicoed-notes" rows="2" placeholder="Comentarios…"></textarea>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Seguimiento</label>
+            <textarea class="form-control" id="edit-iv-followup" rows="2"></textarea>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Comentarios adicionales</label>
+            <textarea class="form-control" id="edit-iv-comments" rows="2"></textarea>
+          </div>
+
+          <div id="edit-conversation-outcome" class="p-3 rounded mb-2" style="background:#f0f4fc">
+            <label class="form-label fw-semibold">¿Cómo terminó la conversación?</label>
+            <div class="d-flex gap-2 flex-wrap">
+              <button type="button" class="btn btn-outline-success edit-conv-outcome-btn" data-val="accepted">
+                <i class="bi bi-check-circle me-1"></i>Aceptó seguimiento
+              </button>
+              <button type="button" class="btn btn-outline-secondary edit-conv-outcome-btn" data-val="refused">
+                <i class="bi bi-x-circle me-1"></i>Rechazó seguimiento
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btn-save-edit">
+          <i class="bi bi-floppy me-1"></i>Guardar cambios
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const STATUS_LABELS = {
+  not_marked:'Sin marcar', pending:'Pendiente', in_progress:'En progreso',
+  rescheduled:'Reagendado', closed_no_answer:'Cerrado – sin respuesta',
+  closed_refused:'Cerrado – rechazó', closed_referred:'Cerrado – remitido',
+  closed_critical:'Cerrado – caso crítico'
+};
+const OUTCOME_LABELS = {
+  no_answer:'No contestó', no_time:'No pudo hablar',
+  completed:'Conversación completa', critical:'Caso crítico'
+};
+
+let allHistoricoData = [];
+let callDataMap = {};
+let histTable = null;
+let currentDetailStudentId = null;
+
+// Edit state
+let editCallId = null;
+let editSelectedOutcome = null;
+let editSelectedStudyHours = null;
+let editSelectedAutonomy = null;
+let editSelectedMotivation = null;
+let editSelectedTeams = null;
+let editSelectedEmail = null;
+let editSelectedConvOutcome = null;
+
+// ─── Load data ───────────────────────────────────────────────
+async function loadHistorico() {
+  document.getElementById('historico-loading').style.display = '';
+  document.getElementById('historico-table-wrap').style.display = 'none';
+
+  const students = await fetch('/api/calls/historico').then(r => r.json());
+  allHistoricoData = students;
+
+  const tbody = document.getElementById('historico-tbody');
+  tbody.innerHTML = students.map(s => `
+    <tr>
+      <td class="fw-semibold">${s.full_name}</td>
+      <td class="text-muted small">${s.doc_number}</td>
+      <td class="small">${s.program || '—'}</td>
+      <td><span class="badge badge-${s.call_status}">${STATUS_LABELS[s.call_status] || s.call_status}</span></td>
+      <td>${callDotsHtml(s.call_count)}</td>
+      <td class="small text-muted">${s.last_call_date || '—'}</td>
+      <td>
+        <button class="btn btn-sm btn-outline-primary" data-student-id="${s.id}">
+          <i class="bi bi-eye me-1"></i>Ver
+        </button>
+      </td>
+    </tr>
+  `).join('');
+
+  document.getElementById('historico-loading').style.display = 'none';
+  document.getElementById('historico-table-wrap').style.display = '';
+
+  if (histTable) { histTable.destroy(); }
+  histTable = new DataTable('#historico-table', {
+    language: { search: 'Buscar:', lengthMenu: 'Mostrar _MENU_ registros', info: '_START_–_END_ de _TOTAL_', paginate: { next: 'Siguiente', previous: 'Anterior' } },
+    pageLength: 25,
+    order: [[0, 'asc']],
+    columnDefs: [{ orderable: false, targets: -1 }],
+  });
+}
+
+function callDotsHtml(count) {
+  let html = '';
+  for (let i = 0; i < 3; i++) html += `<span class="call-dot ${i < count ? 'done' : 'empty'}"></span>`;
+  return `<span class="call-counter">${html} ${count}/3</span>`;
+}
+
+// Event delegation for "Ver" buttons (DataTables re-renders rows)
+document.getElementById('historico-tbody').addEventListener('click', function(e) {
+  const btn = e.target.closest('[data-student-id]');
+  if (btn) openDetail(parseInt(btn.dataset.studentId));
+});
+
+// ─── Detail modal ─────────────────────────────────────────────
+function openDetailContent(studentId) {
+  const student = allHistoricoData.find(s => s.id === studentId);
+  if (!student) return;
+  currentDetailStudentId = studentId;
+
+  document.getElementById('detail-student-name').textContent = student.full_name;
+  document.getElementById('detail-student-meta').textContent =
+    [student.program, student.doc_number].filter(Boolean).join(' · ');
+
+  student.calls.forEach(c => { callDataMap[c.id] = { ...c, studentName: student.full_name }; });
+
+  document.getElementById('detail-body').innerHTML = student.calls.length
+    ? student.calls.map(c => renderCallCard(c)).join('')
+    : '<p class="text-muted">Sin llamadas registradas.</p>';
+}
+
+function openDetail(studentId) {
+  openDetailContent(studentId);
+  const el = document.getElementById('detailModal');
+  (bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el)).show();
+}
+
+function renderCallCard(c) {
+  const outcomeBadge = `<span class="badge bg-secondary">${OUTCOME_LABELS[c.outcome] || c.outcome}</span>`;
+  const reschBadge = c.rescheduled_to
+    ? `<span class="badge bg-info text-dark ms-1"><i class="bi bi-alarm me-1"></i>${c.rescheduled_to}</span>` : '';
+  return `
+    <div class="mb-3 p-3 border rounded bg-white">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <strong>Llamada ${c.call_number}</strong>
+          <span class="ms-2">${outcomeBadge}${reschBadge}</span>
+        </div>
+        <div class="text-end">
+          <div class="text-muted small">${c.call_datetime}</div>
+          <button class="btn btn-sm btn-outline-warning mt-1" onclick="openEditModal(${c.id})">
+            <i class="bi bi-pencil me-1"></i>Editar
+          </button>
+        </div>
+      </div>
+      ${c.notes ? `<div class="mt-2 small text-muted"><i class="bi bi-chat-text me-1"></i>${c.notes}</div>` : ''}
+      ${c.interview ? renderInterviewDisplay(c.interview) : ''}
+    </div>`;
+}
+
+function renderInterviewDisplay(iv) {
+  const yn = v => v === true
+    ? '<span class="text-success fw-semibold">Sí</span>'
+    : '<span class="text-danger fw-semibold">No</span>';
+
+  const fields = [
+    ['Actividad además de estudiar', iv.activity_besides_studying],
+    ['Horas de estudio/día', iv.daily_study_hours],
+    ['Autonomía en virtualidad', iv.autonomy_virtuality],
+    ['Lo más difícil (virtual)', iv.virtual_most_difficult],
+    ['Lo más fácil (virtual)', iv.virtual_most_easy],
+    ['¿Accedió a Teams?', iv.has_teams_access != null ? yn(iv.has_teams_access) : null],
+    ['¿Accedió al correo inst.?', iv.has_email_access != null ? yn(iv.has_email_access) : null],
+    ['Motivación semestre', iv.career_motivation != null ? `${iv.career_motivation}/5` : null],
+    ['Acompañamiento psicosocial', iv.psychosocial_accompaniment ? '<span class="text-warning fw-semibold">Sí</span>' : 'No'],
+    ['Notas psicosocial', iv.psychosocial_notes],
+    ['Acompañamiento psicoeducativo', iv.psychoeducational_accompaniment ? '<span class="text-success fw-semibold">Sí</span>' : 'No'],
+    ['Notas psicoeducativo', iv.psychoeducational_notes],
+    ['Seguimiento', iv.follow_up],
+    ['Comentarios', iv.additional_comments],
+    ['Aceptó seguimiento', iv.accepted_support === true ? '<span class="text-success">Sí</span>' : (iv.accepted_support === false ? '<span class="text-danger">No</span>' : null)],
+    ['Caso crítico', iv.is_critical ? '<span class="text-danger fw-bold">⚠️ Sí</span>' : null],
+  ].filter(([, v]) => v !== null && v !== undefined && v !== '');
+
+  if (!fields.length) return '';
+  return `
+    <div class="mt-2 pt-2 border-top small">
+      <div class="fw-semibold text-primary mb-1"><i class="bi bi-clipboard2-pulse me-1"></i>Entrevista</div>
+      <div class="row g-1">
+        ${fields.map(([k, v]) => `<div class="col-sm-6"><span class="text-muted">${k}:</span> ${v}</div>`).join('')}
+      </div>
+    </div>`;
+}
+
+// ─── Edit modal ───────────────────────────────────────────────
+function openEditModal(callId) {
+  const c = callDataMap[callId];
+  if (!c) return;
+  editCallId = callId;
+
+  const iv = c.interview;
+  editSelectedOutcome = c.outcome;
+  editSelectedStudyHours = iv?.daily_study_hours || null;
+  editSelectedAutonomy = iv?.autonomy_virtuality || null;
+  editSelectedMotivation = iv?.career_motivation != null ? String(iv.career_motivation) : null;
+  editSelectedTeams = iv?.has_teams_access ?? null;
+  editSelectedEmail = iv?.has_email_access ?? null;
+  editSelectedConvOutcome = iv?.accepted_support === true ? 'accepted' : (iv?.accepted_support === false ? 'refused' : null);
+
+  document.getElementById('edit-modal-title').innerHTML =
+    `<i class="bi bi-pencil-square me-2"></i>Llamada ${c.call_number} — ${c.studentName}`;
+
+  // Outcome buttons
+  document.querySelectorAll('.edit-outcome-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.outcome === c.outcome);
+  });
+  toggleEditReschedule(c.outcome);
+
+  // Basic fields
+  document.getElementById('edit-call-notes').value = c.notes || '';
+  document.getElementById('edit-reschedule-datetime').value = c.rescheduled_to_iso || '';
+
+  // Interview section
+  const hasInterview = !!iv;
+  document.getElementById('edit-interview-section').classList.toggle('d-none', !hasInterview);
+
+  if (hasInterview) {
+    document.getElementById('edit-iv-activity').value = iv.activity_besides_studying || '';
+    document.getElementById('edit-iv-difficult').value = iv.virtual_most_difficult || '';
+    document.getElementById('edit-iv-easy').value = iv.virtual_most_easy || '';
+    document.getElementById('edit-iv-psico-notes').value = iv.psychosocial_notes || '';
+    document.getElementById('edit-iv-followup').value = iv.follow_up || '';
+    document.getElementById('edit-iv-comments').value = iv.additional_comments || '';
+    document.getElementById('edit-iv-psico-check').checked = !!iv.psychosocial_accompaniment;
+    document.getElementById('edit-iv-psicoed-check').checked = !!iv.psychoeducational_accompaniment;
+    document.getElementById('edit-iv-psicoed-notes').value = iv.psychoeducational_notes || '';
+
+    // Button groups — clear all then activate
+    document.querySelectorAll('.edit-iv-option-btn, .edit-motivation-btn, .edit-conv-outcome-btn')
+      .forEach(b => b.classList.remove('active'));
+
+    activateEditBtn('edit-study-hours', iv.daily_study_hours);
+    activateEditBtn('edit-autonomy', iv.autonomy_virtuality);
+    if (iv.has_teams_access != null) activateEditBtn('edit-teams-access', String(iv.has_teams_access));
+    if (iv.has_email_access != null) activateEditBtn('edit-email-access', String(iv.has_email_access));
+
+    if (iv.career_motivation != null) {
+      document.querySelector(`.edit-motivation-btn[data-val="${iv.career_motivation}"]`)?.classList.add('active');
+    }
+    if (editSelectedConvOutcome) {
+      document.querySelector(`.edit-conv-outcome-btn[data-val="${editSelectedConvOutcome}"]`)?.classList.add('active');
+    }
+    document.getElementById('edit-conversation-outcome').classList.toggle('d-none', c.outcome === 'critical');
+  }
+
+  const el = document.getElementById('editCallModal');
+  (bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el)).show();
+}
+
+function activateEditBtn(group, val) {
+  if (val == null) return;
+  document.querySelector(`.edit-iv-option-btn[data-group="${group}"][data-val="${val}"]`)?.classList.add('active');
+}
+
+function toggleEditReschedule(outcome) {
+  document.getElementById('edit-reschedule-section').classList.toggle('d-none', outcome !== 'no_time');
+}
+
+// Outcome buttons
+document.querySelectorAll('.edit-outcome-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.edit-outcome-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    editSelectedOutcome = btn.dataset.outcome;
+    toggleEditReschedule(editSelectedOutcome);
+    if (document.getElementById('edit-interview-section').offsetParent !== null) {
+      document.getElementById('edit-conversation-outcome').classList.toggle('d-none', editSelectedOutcome === 'critical');
+    }
+  });
+});
+
+// Generic option buttons (study hours, autonomy, teams, email)
+document.getElementById('editCallModal').addEventListener('click', function(e) {
+  const btn = e.target.closest('.edit-iv-option-btn');
+  if (!btn) return;
+  const group = btn.dataset.group;
+  document.querySelectorAll(`.edit-iv-option-btn[data-group="${group}"]`).forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (group === 'edit-study-hours') editSelectedStudyHours = btn.dataset.val;
+  else if (group === 'edit-autonomy') editSelectedAutonomy = btn.dataset.val;
+  else if (group === 'edit-teams-access') editSelectedTeams = btn.dataset.val === 'true';
+  else if (group === 'edit-email-access') editSelectedEmail = btn.dataset.val === 'true';
+});
+
+// Motivation buttons
+document.querySelectorAll('.edit-motivation-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.edit-motivation-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    editSelectedMotivation = btn.dataset.val;
+  });
+});
+
+// Conversation outcome
+document.querySelectorAll('.edit-conv-outcome-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.edit-conv-outcome-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    editSelectedConvOutcome = btn.dataset.val;
+  });
+});
+
+// Save edit
+document.getElementById('btn-save-edit').addEventListener('click', async () => {
+  if (!editSelectedOutcome) { alert('Selecciona el resultado de la llamada.'); return; }
+
+  const payload = {
+    outcome: editSelectedOutcome,
+    notes: document.getElementById('edit-call-notes').value,
+    rescheduled_to: document.getElementById('edit-reschedule-datetime').value || null,
+  };
+
+  if (!document.getElementById('edit-interview-section').classList.contains('d-none')) {
+    payload.interview = {
+      activity_besides_studying: document.getElementById('edit-iv-activity').value,
+      daily_study_hours: editSelectedStudyHours,
+      autonomy_virtuality: editSelectedAutonomy,
+      virtual_most_difficult: document.getElementById('edit-iv-difficult').value,
+      virtual_most_easy: document.getElementById('edit-iv-easy').value,
+      has_teams_access: editSelectedTeams,
+      has_email_access: editSelectedEmail,
+      career_motivation: editSelectedMotivation ? parseInt(editSelectedMotivation) : null,
+      psychosocial_accompaniment: document.getElementById('edit-iv-psico-check').checked,
+      psychosocial_notes: document.getElementById('edit-iv-psico-notes').value,
+      psychoeducational_accompaniment: document.getElementById('edit-iv-psicoed-check').checked,
+      psychoeducational_notes: document.getElementById('edit-iv-psicoed-notes').value,
+      follow_up: document.getElementById('edit-iv-followup').value,
+      additional_comments: document.getElementById('edit-iv-comments').value,
+      accepted_support: editSelectedConvOutcome === 'accepted' ? true : (editSelectedConvOutcome === 'refused' ? false : null),
+    };
+  }
+
+  const res = await fetch(`/api/calls/${editCallId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) { alert('Error al guardar los cambios.'); return; }
+
+  bootstrap.Modal.getInstance(document.getElementById('editCallModal')).hide();
+
+  // Reload data and refresh detail modal content
+  await loadHistorico();
+  if (currentDetailStudentId) openDetailContent(currentDetailStudentId);
+});
+
+loadHistorico();
+</script>
+{% endblock %}
